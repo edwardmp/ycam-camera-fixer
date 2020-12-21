@@ -14,13 +14,27 @@ import (
 
 type sunriseSunsetResponse struct {
 	sunriseSunsetData `json:"results"`
-	Status string `json:"status"`
-	LastFetch time.Time
+	Status            string `json:"status"`
+	LastFetch         time.Time
 }
 
 type sunriseSunsetData struct {
 	Sunrise time.Time `json:"sunrise"`
-	Sunset time.Time `json:"sunset"`
+	Sunset  time.Time `json:"sunset"`
+}
+
+func (s sunriseSunsetResponse) String() string {
+	return fmt.Sprintf(
+		"[Status: %s], [LastFetch: %s], [Sunrise: %s], [Sunset: %s]",
+		s.Status,
+		s.LastFetch,
+		s.Sunrise,
+		s.Sunset)
+}
+
+func (s sunriseSunsetResponse) DataIsOutdated() bool {
+	now := time.Now()
+	return !s.LastFetch.Truncate(time.Hour * 24).Equal(now.Truncate(time.Hour * 24))
 }
 
 func main() {
@@ -31,33 +45,46 @@ func main() {
 	for {
 		now := time.Now()
 		// check if data was fetched last yesterday
-		if (sunriseSunsetResponse == nil || !sunriseSunsetResponse.LastFetch.Truncate(time.Hour * 24).Equal(now.Truncate(time.Hour * 24))) {
-			response := getSunsetSunriseTimes()
-			sunriseSunsetResponse = &response
+		if sunriseSunsetResponse == nil || sunriseSunsetResponse.DataIsOutdated() {
+			response, err := getSunsetSunriseTimes()
+			if err != nil {
+				fmt.Println(err.Error())
+				continue
+			}
+
+			sunriseSunsetResponse = response
 
 			sunriseChangeDone = false
 			sunsetChangeDone = false
-		}
+		} else if !sunriseChangeDone && now.After(sunriseSunsetResponse.Sunrise) && now.Before(sunriseSunsetResponse.Sunset) {
+			err := changeCameraSettingsForDay()
+			if err != nil {
+				fmt.Println(err.Error())
+				continue
+			}
 
-		if (!sunriseChangeDone && now.After(sunriseSunsetResponse.Sunrise) && now.Before(sunriseSunsetResponse.Sunset)) {
-			changeCameraSettingsForDay()
 			sunriseChangeDone = true
-		} else if (!sunsetChangeDone && now.After(sunriseSunsetResponse.Sunset)) {
-			changeCameraSettingsForNight()
+		} else if !sunsetChangeDone && now.After(sunriseSunsetResponse.Sunset) {
+			err := changeCameraSettingsForNight()
+			if err != nil {
+				fmt.Println(err.Error())
+				continue
+			}
+
 			sunsetChangeDone = true
 		}
 	}
 }
 
-func getSunsetSunriseTimes() sunriseSunsetResponse {
+func getSunsetSunriseTimes() (*sunriseSunsetResponse, error) {
 	// Create request
 	currentTime := time.Now()
-	url := fmt.Sprintf("https://api.sunrise-sunset.org/json?lat=52.142501&lng=4.396298&date=%s&formatted=0", currentTime.Format("2006-01-02"))
+	currentDate := currentTime.Format("2006-01-02")
+	requestUrl := fmt.Sprintf("https://api.sunrise-sunset.org/json?lat=52.142501&lng=4.396298&date=%s&formatted=0", currentDate)
 
-	resp, err := http.Get(url)
-
+	resp, err := http.Get(requestUrl)
 	if err != nil {
-		fmt.Println("Failure : ", err)
+		return nil, fmt.Errorf("could not get sunrise/sunset data: %s", err)
 	}
 
 	// Read Response Body
@@ -73,13 +100,12 @@ func getSunsetSunriseTimes() sunriseSunsetResponse {
 	}
 
 	sunriseSunsetResponse.LastFetch = time.Now()
+	log.Print("Sunset/sunrise times fetched: ", sunriseSunsetResponse)
 
-	log.Print("Sunset/sunrise times fetched: ", sunriseSunsetResponse.Status)
-
-	return sunriseSunsetResponse
+	return &sunriseSunsetResponse, nil
 }
 
-func changeCameraSettingsForDay() {
+func changeCameraSettingsForDay() error {
 	params := url.Values{}
 	params.Set("IRLED", "off")
 	params.Set("BWMODE", "off")
@@ -87,10 +113,10 @@ func changeCameraSettingsForDay() {
 	params.Set("IRCUT", "off")
 
 	log.Print("Changing camera settings for day..")
-	changeCameraSettings(params)
+	return changeCameraSettings(params)
 }
 
-func changeCameraSettingsForNight() {
+func changeCameraSettingsForNight() error {
 	params := url.Values{}
 	params.Set("IRLED", "on")
 	params.Set("BWMODE", "on")
@@ -98,37 +124,47 @@ func changeCameraSettingsForNight() {
 	params.Set("IRCUT", "on")
 
 	log.Print("Changing camera settings for night..")
-	changeCameraSettings(params)
+	return changeCameraSettings(params)
 }
 
-func changeCameraSettings(params url.Values) {
+func changeCameraSettings(params url.Values) error {
 	body := bytes.NewBufferString(params.Encode())
 
-	// Create client
 	client := &http.Client{}
 
-	// Create request
 	cameraIp := os.Getenv("CAMERA_IP")
 	if cameraIp == "" {
 		log.Fatal("CAMERA_IP env variable is not set")
 	}
 
-	url := fmt.Sprintf("http://%s/form/nvctlApply", cameraIp)
-	req, err := http.NewRequest("POST", url, body)
+	requestUrl := fmt.Sprintf("http://%s/form/nvctlApply", cameraIp)
+	req, err := http.NewRequest("POST", requestUrl, body)
+	if err != nil {
+		return fmt.Errorf("could not create request: %s", err)
+	}
+
+	authUsername := os.Getenv("AUTH_USERNAME")
+	if authUsername == "" {
+		log.Fatal("AUTH_USERNAME env variable is not set")
+	}
+
+	authPassword := os.Getenv("AUTH_PASSWORD")
+	if authPassword == "" {
+		log.Fatal("authPassword env variable is not set")
+	}
+	req.SetBasicAuth(authUsername, authPassword)
 
 	// Headers
-	basicAuthEncoded := os.Getenv("BASIC_AUTH")
-	req.Header.Add("Authorization", fmt.Sprintf("Basic %s", basicAuthEncoded))
-
 	req.Header.Add("Content-Type", "application/x-www-form-urlencoded; charset=utf-8")
 
 	// Fetch Request
 	resp, err := client.Do(req)
-
 	if err != nil {
-		fmt.Println("Failure : ", err)
+		return fmt.Errorf("could not change camera settings: %s", err)
 	}
 
 	// Display Results
-	log.Print("Response Status: ", resp.Status)
+	log.Print("Camera response status: ", resp.Status)
+
+	return nil
 }
