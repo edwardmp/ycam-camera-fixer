@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
-	"net/url"
 	"net/http"
+	"net/url"
 	"os"
 	"time"
 )
@@ -98,7 +98,11 @@ func getSunsetSunriseTimes() (*sunriseSunsetResponse, error) {
 	sunriseSunsetResponse := sunriseSunsetResponse{}
 	jsonErr := json.Unmarshal(respBody, &sunriseSunsetResponse)
 	if jsonErr != nil {
-		log.Fatal(jsonErr)
+		return nil, fmt.Errorf("sunrise/sunset API response could not be unmarshalled: %s", jsonErr)
+	}
+
+	if sunriseSunsetResponse.Status != "OK" {
+		return nil, fmt.Errorf("sunrise/sunset API status is not OK: %s", sunriseSunsetResponse.Status)
 	}
 
 	sunriseSunsetResponse.LastFetch = time.Now()
