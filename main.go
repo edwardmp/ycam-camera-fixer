@@ -43,6 +43,8 @@ func main() {
 	sunsetChangeDone := false
 
 	for {
+		time.Sleep(1 * time.Minute)
+
 		now := time.Now()
 		// check if data was fetched last yesterday
 		if sunriseSunsetResponse == nil || sunriseSunsetResponse.DataIsOutdated() {
