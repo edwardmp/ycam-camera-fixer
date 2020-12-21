@@ -109,6 +109,10 @@ func changeCameraSettings(params url.Values) {
 
 	// Create request
 	cameraIp := os.Getenv("CAMERA_IP")
+	if cameraIp == "" {
+		log.Fatal("CAMERA_IP env variable is not set")
+	}
+
 	url := fmt.Sprintf("http://%s/form/nvctlApply", cameraIp)
 	req, err := http.NewRequest("POST", url, body)
 
