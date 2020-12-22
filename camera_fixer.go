@@ -19,8 +19,6 @@ type cameraFixer struct {
 }
 
 func (c *cameraFixer) run() {
-	defer time.Sleep(1 * time.Second)
-
 	now := time.Now()
 	// check if data was fetched last yesterday
 	if c.sunriseSunsetResponse.DataIsOutdatedComparedTo(now) {

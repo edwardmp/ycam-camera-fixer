@@ -3,6 +3,7 @@ package main
 import (
 	"github.com/caarlos0/env/v6"
 	"log"
+	"time"
 )
 
 type config struct {
@@ -12,6 +13,7 @@ type config struct {
 	TimeZone                string  `env:"TZ" envDefault:"UTC"`
 	CameraLocationLatitude  float32 `env:"CAMERA_LOCATION_LATITUDE,required"`
 	CameraLocationLongitude float32 `env:"CAMERA_LOCATION_LONGITUDE,required"`
+	TickIntervalSeconds     int     `env:"TICK_INTERVAL_SECONDS" envDefault:"60"`
 }
 
 func main() {
@@ -21,7 +23,7 @@ func main() {
 	}
 
 	cameraFixer := cameraFixer{config: cfg}
-	for {
+	for range time.Tick(time.Duration(cfg.TickIntervalSeconds) * time.Second) {
 		cameraFixer.run()
 	}
 }
