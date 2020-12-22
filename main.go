@@ -11,8 +11,8 @@ type config struct {
 	AuthUsername            string  `env:"AUTH_USERNAME,required"`
 	AuthPassword            string  `env:"AUTH_PASSWORD,required"`
 	TimeZone                string  `env:"TZ" envDefault:"UTC"`
-	CameraLocationLatitude  float32 `env:"CAMERA_LOCATION_LATITUDE,required"`
-	CameraLocationLongitude float32 `env:"CAMERA_LOCATION_LONGITUDE,required"`
+	CameraLocationLatitude  float64 `env:"CAMERA_LOCATION_LATITUDE,required"`
+	CameraLocationLongitude float64 `env:"CAMERA_LOCATION_LONGITUDE,required"`
 	TickIntervalSeconds     int     `env:"TICK_INTERVAL_SECONDS" envDefault:"60"`
 }
 
