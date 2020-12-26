@@ -26,5 +26,8 @@ func (s sunriseSunsetResponse) String() string {
 }
 
 func (s sunriseSunsetResponse) DataIsOutdatedComparedTo(comparisonTime time.Time) bool {
-	return s.Status != "OK" || !s.LastFetch.Truncate(time.Hour*24).Equal(comparisonTime.Truncate(time.Hour*24))
+	y1, m1, d1 := s.LastFetch.Date()
+	y2, m2, d2 := comparisonTime.Date()
+
+	return s.Status != "OK" || !(y1 == y2 && m1 == m2 && d1 == d2)
 }

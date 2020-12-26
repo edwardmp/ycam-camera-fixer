@@ -8,7 +8,7 @@ import (
 func Test_sunriseSunsetResponse_DataIsOutdatedComparedTo(t *testing.T) {
 	referenceTime, _ := time.Parse(
 		time.RFC3339,
-		"2020-12-22T00:01:41+00:00")
+		"2020-12-22T00:01:41+01:00")
 
 	type fields struct {
 		LastFetch time.Time
